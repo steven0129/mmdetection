@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from mmcv.cnn import normal_init
 
-from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms, multiclass_nms_with_mask
+from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms
 # from mmdet.ops import ModulatedDeformConvPack
 
 from mmdet.models.builder import build_loss
@@ -465,25 +465,31 @@ class PolarMask_Head(nn.Module):
             '''1 mask->min_bbox->nms, performance same to origin box'''
             a = _mlvl_masks
             _mlvl_bboxes = torch.stack([a[:, 0].min(1)[0],a[:, 1].min(1)[0],a[:, 0].max(1)[0],a[:, 1].max(1)[0]],-1)
-            det_bboxes, det_labels, det_masks = multiclass_nms_with_mask(
+            det_bboxes, det_labels, keep = multiclass_nms(
                 _mlvl_bboxes,
                 mlvl_scores,
-                _mlvl_masks,
                 cfg.score_thr,
                 cfg.nms,
                 cfg.max_per_img,
-                score_factors=mlvl_centerness + centerness_factor)
+                score_factors=mlvl_centerness + centerness_factor,
+                return_inds=True
+            )
+
+            det_masks = _mlvl_masks[keep]
 
         else:
             '''2 origin bbox->nms, performance same to mask->min_bbox'''
-            det_bboxes, det_labels, det_masks = multiclass_nms_with_mask(
+            det_bboxes, det_labels, keep = multiclass_nms(
                 _mlvl_bboxes,
                 mlvl_scores,
-                _mlvl_masks,
                 cfg.score_thr,
                 cfg.nms,
                 cfg.max_per_img,
-                score_factors=mlvl_centerness + centerness_factor)
+                score_factors=mlvl_centerness + centerness_factor,
+                return_inds=True
+            )
+
+            det_masks = _mlvl_masks[keep]
 
         return det_bboxes, det_labels, det_masks
 

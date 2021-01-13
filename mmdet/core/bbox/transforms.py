@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import cv2
+import pycocotools.mask as mask_util
 
 '''bbox and mask 转成result mask要画图'''
 def bbox_mask2result(bboxes, masks, labels, num_classes, img_meta):
@@ -16,12 +18,13 @@ def bbox_mask2result(bboxes, masks, labels, num_classes, img_meta):
     """
     ori_shape = img_meta['ori_shape']
     img_h, img_w, _ = ori_shape
+    masks = masks.cpu()
 
     mask_results = [[] for _ in range(num_classes - 1)]
 
     for i in range(masks.shape[0]):
         im_mask = np.zeros((img_h, img_w), dtype=np.uint8)
-        mask = [masks[i].transpose(1,0).unsqueeze(1).int().data.cpu().numpy()]
+        mask = [masks[i].transpose(1,0).unsqueeze(1).int().data.numpy()]
         im_mask = cv2.drawContours(im_mask, mask, -1,1,-1)
         rle = mask_util.encode(
             np.array(im_mask[:, :, np.newaxis], order='F'))[0]
