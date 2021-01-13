@@ -98,11 +98,12 @@ data = dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/instances_val2017.json',
         img_prefix=data_root + 'val2017/',
-        pipeline=test_pipeline))
+        pipeline=test_pipeline)
+    )
 
 # optimizer
 lr_ratio = 1
-optimizer = dict(type='SGD', lr=0.01 * lr_ratio, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=1e-3 * lr_ratio, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
@@ -128,4 +129,4 @@ log_level = 'INFO'
 work_dir = './work_dirs/trash'
 load_from = None
 resume_from = None
-workflow = [('train', 1), ('val', 1)]
+workflow = [('train', 1)]
