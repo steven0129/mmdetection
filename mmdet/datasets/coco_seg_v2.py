@@ -62,7 +62,7 @@ class CocoSegDatasetV2(CustomDataset):
         gt_masks = torch.from_numpy(data['gt_masks'].data.to_ndarray())
         gt_labels = data['gt_labels'].data
         
-        #--------------------offline ray label generation-----------------------------
+        #--------------------offline ray label generation start-----------------------------
         self.center_sample = True
         self.use_mask_center = True
 
@@ -89,7 +89,7 @@ class CocoSegDatasetV2(CustomDataset):
         data['_gt_labels'] = DC(_labels)
         data['_gt_bboxes'] = DC(_bbox_targets)
         data['_gt_masks'] = DC(_mask_targets)
-        #--------------------offline ray label generation-----------------------------
+        #--------------------offline ray label generation end-----------------------------
 
         return data
 
