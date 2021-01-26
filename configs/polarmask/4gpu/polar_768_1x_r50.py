@@ -21,7 +21,7 @@ model = dict(
         relu_before_extra_convs=True),
     bbox_head=dict(
         type='PolarMask_Head',
-        num_classes=81,
+        num_classes=12,  # include background class
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
@@ -55,7 +55,7 @@ test_cfg = dict(
 # dataset settings
 dataset_type = 'CocoSegDatasetV2'
 data_root = 'data/coco/'
-img_norm_cfg = dict(mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=True)
+img_norm_cfg = dict(mean=[0, 0, 0], std=[256, 256, 256], to_rgb=True)
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -86,24 +86,24 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_train2017.json',
+        ann_file=data_root + 'annotations/custom_instances_train2017.json',
         img_prefix=data_root + 'train2017/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
+        ann_file=data_root + 'annotations/custom_instances_val2017.json',
         img_prefix=data_root + 'val2017/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
+        ann_file=data_root + 'annotations/custom_instances_val2017.json',
         img_prefix=data_root + 'val2017/',
         pipeline=test_pipeline)
     )
 
 # optimizer
 lr_ratio = 1
-optimizer = dict(type='SGD', lr=1e-3 * lr_ratio, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=0.01 * lr_ratio, momentum=0.9, weight_decay=0.0001, paramwise_cfg=dict(bias_lr_mult=2., bias_decay_mult=0.))
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
