@@ -71,5 +71,5 @@ class PolarMask(SingleStageDetector):
         bbox_results = results[0][0]
         mask_results = results[0][1]
 
-        return bbox_results, mask_results
+        return [(bbox_results, mask_results)]
 
