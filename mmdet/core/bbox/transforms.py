@@ -18,31 +18,23 @@ def bbox_mask2result(bboxes, masks, labels, num_classes, img_meta):
     """
     ori_shape = img_meta['ori_shape']
     img_h, img_w, _ = ori_shape
-    masks = masks.cpu()
-
-    mask_results = [[] for _ in range(num_classes - 1)]
+    masks = masks.cpu().numpy()
+    mask_results = [[] for _ in range(num_classes)]
 
     for i in range(masks.shape[0]):
         im_mask = np.zeros((img_h, img_w), dtype=np.uint8)
-        mask = [masks[i].transpose(1,0).unsqueeze(1).int().data.numpy()]
-        im_mask = cv2.drawContours(im_mask, mask, -1,1,-1)
-        rle = mask_util.encode(
-            np.array(im_mask[:, :, np.newaxis], order='F'))[0]
-
+        mask = [np.expand_dims(np.transpose(masks[i]), axis=1).astype(np.int32)]
+        im_mask = cv2.drawContours(im_mask, mask, -1, 1, -1)
         label = labels[i]
-
-        mask_results[label].append(rle)
-
+        mask_results[label].append(np.array(im_mask, dtype=np.bool))
 
     if bboxes.shape[0] == 0:
-        bbox_results = [
-            np.zeros((0, 5), dtype=np.float32) for i in range(num_classes - 1)
-        ]
+        bbox_results = [np.zeros((0, 5), dtype=np.float32) for i in range(num_classes)]
         return bbox_results, mask_results
     else:
-        bboxes = bboxes.cpu().numpy()
-        labels = labels.cpu().numpy()
-        bbox_results = [bboxes[labels == i, :] for i in range(num_classes - 1)]
+        bboxes = bboxes.detach().cpu().numpy()
+        labels = labels.detach().cpu().numpy()
+        bbox_results = [bboxes[labels == i, :] for i in range(num_classes)]
         return bbox_results, mask_results
 
 def bbox_flip(bboxes, img_shape, direction='horizontal'):
