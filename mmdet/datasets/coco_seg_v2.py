@@ -34,20 +34,7 @@ except AssertionError:
 @DATASETS.register_module()
 class CocoSegDatasetV2(CustomDataset):
 
-    CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-               'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
-               'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
-               'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-               'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-               'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-               'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-               'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-               'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-               'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-               'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-               'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
-               'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-               'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
+    CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'boat', 'bird', 'cat', 'dog', 'horse', 'cow')
 
     def prepare_train_img(self, idx):
         img_info = self.data_infos[idx]
@@ -82,10 +69,11 @@ class CocoSegDatasetV2(CustomDataset):
 
         concat_regress_ranges = torch.cat(expanded_regress_ranges, dim=0)
         concat_points = torch.cat(all_level_points, 0)
-        _labels, _bbox_targets, _mask_targets = self.polar_target_single(
-            gt_bboxes,gt_masks,gt_labels,concat_points, concat_regress_ranges
-        )
         
+        _labels, _bbox_targets, _mask_targets = self.polar_target_single(
+            gt_bboxes, gt_masks, gt_labels, concat_points, concat_regress_ranges
+        )
+
         data['_gt_labels'] = DC(_labels)
         data['_gt_bboxes'] = DC(_bbox_targets)
         data['_gt_masks'] = DC(_mask_targets)
@@ -118,7 +106,7 @@ class CocoSegDatasetV2(CustomDataset):
         return points.float()
 
     def get_centerpoint(self, lis):
-        area = 0.0
+        area = 1e-8
         x, y = 0.0, 0.0
         a = len(lis)
         for i in range(a):
@@ -134,6 +122,7 @@ class CocoSegDatasetV2(CustomDataset):
             area += fg
             x += fg * (lat + lat1) / 3.0
             y += fg * (lng + lng1) / 3.0
+        
         x = x / area
         y = y / area
 
@@ -247,13 +236,9 @@ class CocoSegDatasetV2(CustomDataset):
             return gt_labels.new_zeros(num_points), \
                    gt_bboxes.new_zeros((num_points, 4))
 
-        areas = (gt_bboxes[:, 2] - gt_bboxes[:, 0] + 1) * (
-            gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1)
-        # TODO: figure out why these two are different
-        # areas = areas[None].expand(num_points, num_gts)
+        areas = (gt_bboxes[:, 2] - gt_bboxes[:, 0] + 1) * (gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1)
         areas = areas[None].repeat(num_points, 1)
-        regress_ranges = regress_ranges[:, None, :].expand(
-            num_points, num_gts, 2)
+        regress_ranges = regress_ranges[:, None, :].expand(num_points, num_gts, 2)
         gt_bboxes = gt_bboxes[None].expand(num_points, num_gts, 4)
         #xs ys 分别是points的x y坐标
         xs, ys = points[:, 0], points[:, 1]
@@ -265,14 +250,11 @@ class CocoSegDatasetV2(CustomDataset):
         bottom = gt_bboxes[..., 3] - ys
         bbox_targets = torch.stack((left, top, right, bottom), -1)   #feature map上所有点对于gtbox的上下左右距离 [num_pix, num_gt, 4]
 
-
-
         #mask targets 也按照这种写 同时labels 得从bbox中心修改成mask 重心
         mask_centers = []
         mask_contours = []
+
         #第一步 先算重心  return [num_gt, 2]
-
-
         for mask in gt_masks:
             cnt, contour = self.get_single_centerpoint(mask)
             contour = contour[0]
@@ -319,11 +301,10 @@ class CocoSegDatasetV2(CustomDataset):
         min_area, min_area_inds = areas.min(dim=1)
 
         labels = gt_labels[min_area_inds]
-        labels[min_area == INF] = 0         #[num_gt] 介于0-80
+        labels[min_area == INF] = len(self.CLASSES)
 
         bbox_targets = bbox_targets[range(num_points), min_area_inds]
-        pos_inds = labels.nonzero().reshape(-1)
-
+        pos_inds = (labels != len(self.CLASSES)).nonzero().reshape(-1)
         mask_targets = torch.zeros(num_points, 36).float()
 
         pos_mask_ids = min_area_inds[pos_inds]

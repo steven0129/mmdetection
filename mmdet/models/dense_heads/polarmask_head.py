@@ -79,7 +79,6 @@ class PolarMask_Head(nn.Module):
         self.mask_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
             chn = self.in_channels if i == 0 else self.feat_channels
-            # if not self.use_dcn:
             self.cls_convs.append(
                 ConvModule(
                     chn,
@@ -110,51 +109,7 @@ class PolarMask_Head(nn.Module):
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg,
                     bias=self.norm_cfg is None))
-            # else:
-            #     self.cls_convs.append(
-            #         ModulatedDeformConvPack(
-            #             chn,
-            #             self.feat_channels,
-            #             3,
-            #             stride=1,
-            #             padding=1,
-            #             dilation=1,
-            #             deformable_groups=1,
-            #         ))
-            #     if self.norm_cfg:
-            #         self.cls_convs.append(build_norm_layer(self.norm_cfg, self.feat_channels)[1])
-            #     self.cls_convs.append(nn.ReLU(inplace=True))
-
-            #     self.reg_convs.append(
-            #         ModulatedDeformConvPack(
-            #             chn,
-            #             self.feat_channels,
-            #             3,
-            #             stride=1,
-            #             padding=1,
-            #             dilation=1,
-            #             deformable_groups=1,
-            #         ))
-            #     if self.norm_cfg:
-            #         self.reg_convs.append(build_norm_layer(self.norm_cfg, self.feat_channels)[1])
-            #     self.reg_convs.append(nn.ReLU(inplace=True))
-
-            #     self.mask_convs.append(
-            #         ModulatedDeformConvPack(
-            #             chn,
-            #             self.feat_channels,
-            #             3,
-            #             stride=1,
-            #             padding=1,
-            #             dilation=1,
-            #             deformable_groups=1,
-            #         ))
-            #     if self.norm_cfg:
-            #         self.mask_convs.append(build_norm_layer(self.norm_cfg, self.feat_channels)[1])
-            #     self.mask_convs.append(nn.ReLU(inplace=True))
-
-        self.polar_cls = nn.Conv2d(
-            self.feat_channels, self.cls_out_channels, 3, padding=1)
+        self.polar_cls = nn.Conv2d(self.feat_channels, self.cls_out_channels, 3, padding=1)
         self.polar_reg = nn.Conv2d(self.feat_channels, 4, 3, padding=1)
         self.polar_mask = nn.Conv2d(self.feat_channels, 36, 3, padding=1)
         self.polar_centerness = nn.Conv2d(self.feat_channels, 1, 3, padding=1)
@@ -251,7 +206,7 @@ class PolarMask_Head(nn.Module):
         flatten_mask_targets = torch.cat(mask_targets)  # [num_pixel, 36]
         flatten_points = torch.cat([points.repeat(num_imgs, 1)
                                     for points in all_level_points])  # [num_pixel,2]
-        pos_inds = flatten_labels.nonzero().reshape(-1)
+        pos_inds = (flatten_labels != self.num_classes - 1).nonzero().reshape(-1)
         num_pos = len(pos_inds)
 
         loss_cls = self.loss_cls(
@@ -268,8 +223,7 @@ class PolarMask_Head(nn.Module):
 
             pos_points = flatten_points[pos_inds]
             pos_decoded_bbox_preds = distance2bbox(pos_points, pos_bbox_preds)
-            pos_decoded_target_preds = distance2bbox(pos_points,
-                                                     pos_bbox_targets)
+            pos_decoded_target_preds = distance2bbox(pos_points, pos_bbox_targets)
 
             # centerness weighted iou loss
             loss_bbox = self.loss_bbox(
