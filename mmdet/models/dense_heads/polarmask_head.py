@@ -26,8 +26,7 @@ class PolarMask_Head(nn.Module):
                  feat_channels=256,
                  stacked_convs=4,
                  strides=(4, 8, 16, 32, 64),
-                 regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512),
-                                 (512, INF)),
+                 regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512), (512, INF)),
                  use_dcn=False,
                  mask_nms=False,
                  loss_cls=dict(
@@ -206,12 +205,10 @@ class PolarMask_Head(nn.Module):
         flatten_mask_targets = torch.cat(mask_targets)  # [num_pixel, 36]
         flatten_points = torch.cat([points.repeat(num_imgs, 1)
                                     for points in all_level_points])  # [num_pixel,2]
-        pos_inds = (flatten_labels != self.num_classes - 1).nonzero().reshape(-1)
+        pos_inds = (flatten_labels != (self.num_classes - 1)).nonzero().reshape(-1)
         num_pos = len(pos_inds)
 
-        loss_cls = self.loss_cls(
-            flatten_cls_scores, flatten_labels,
-            avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
+        loss_cls = self.loss_cls(flatten_cls_scores, flatten_labels, avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
         pos_bbox_preds = flatten_bbox_preds[pos_inds]
         pos_centerness = flatten_centerness[pos_inds]
         pos_mask_preds = flatten_mask_preds[pos_inds]
