@@ -90,6 +90,9 @@ class CustomDataset(Dataset):
         else:
             self.proposals = None
 
+        # processing pipeline
+        self.pipeline = Compose(pipeline)
+
         # filter images too small and containing no annotations
         if not test_mode:
             valid_inds = self._filter_imgs()
@@ -99,8 +102,7 @@ class CustomDataset(Dataset):
             # set group flag for the sampler
             self._set_group_flag()
 
-        # processing pipeline
-        self.pipeline = Compose(pipeline)
+        
 
     def __len__(self):
         """Total number of samples of data."""

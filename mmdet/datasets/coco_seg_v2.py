@@ -13,6 +13,7 @@ from mmcv.parallel import DataContainer as DC
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from terminaltables import AsciiTable
+from tqdm import tqdm
 
 from mmdet.core import eval_recalls
 from .builder import DATASETS
@@ -69,7 +70,9 @@ class CocoSegDatasetV2(CustomDataset):
 
         concat_regress_ranges = torch.cat(expanded_regress_ranges, dim=0)
         concat_points = torch.cat(all_level_points, 0)
-        
+
+        gt_bboxes, gt_masks, gt_labels = self._filter_gt_masks_empty(gt_bboxes, gt_masks, gt_labels)
+
         _labels, _bbox_targets, _mask_targets = self.polar_target_single(
             gt_bboxes, gt_masks, gt_labels, concat_points, concat_regress_ranges
         )
@@ -80,6 +83,40 @@ class CocoSegDatasetV2(CustomDataset):
         #--------------------offline ray label generation end-----------------------------
 
         return data
+
+    def _filter_gt_masks_empty(self, gt_bboxes, gt_masks, gt_labels):
+        non_valid_idx = []
+        for idx, mask in enumerate(gt_masks):
+            contour, _ = cv2.findContours(mask.numpy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+            contour.sort(key=lambda x: cv2.contourArea(x), reverse=True)
+            try:
+                count = contour[0][:, 0, :]
+            except IndexError:
+                non_valid_idx.append(idx)
+
+        if len(non_valid_idx) != 0:
+            print(f'{len(non_valid_idx)} gt_masks is non-valid. Remove non-valid masks...')
+            
+            new_gt_bboxes = []
+            new_gt_masks = []
+            new_gt_labels = []
+            prev_ptr = 0
+            for idx in non_valid_idx:
+                new_gt_bboxes.append(gt_bboxes[prev_ptr:idx])
+                new_gt_masks.append(gt_masks[prev_ptr:idx])
+                new_gt_labels.append(gt_labels[prev_ptr:idx])
+
+                prev_ptr = idx + 1
+
+            new_gt_bboxes.append(gt_bboxes[prev_ptr : gt_bboxes.size(0)])
+            new_gt_masks.append(gt_masks[prev_ptr : gt_masks.size(0)])
+            new_gt_labels.append(gt_labels[prev_ptr : gt_labels.size(0)])
+
+            gt_bboxes = torch.cat(new_gt_bboxes, axis=0)
+            gt_masks = torch.cat(new_gt_masks, axis=0)
+            gt_labels = torch.cat(new_gt_labels, axis=0)
+
+        return gt_bboxes, gt_masks, gt_labels
 
     def get_featmap_size(self, shape):
         h,w = shape[:2]
@@ -132,7 +169,12 @@ class CocoSegDatasetV2(CustomDataset):
         contour, _ = cv2.findContours(mask.numpy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         contour.sort(key=lambda x: cv2.contourArea(x), reverse=True) #only save the biggest one
         '''debug IndexError: list index out of range'''
-        count = contour[0][:, 0, :]
+        try:
+            count = contour[0][:, 0, :]
+        except IndexError:
+            print('Index error after cv2.findContours()')
+            exit()
+        
         try:
             center = self.get_centerpoint(count)
         except:
@@ -382,8 +424,31 @@ class CocoSegDatasetV2(CustomDataset):
         ids_in_cat &= ids_with_ann
 
         valid_img_ids = []
-        for i, img_info in enumerate(self.data_infos):
+        print('filtering images...')
+        for i, img_info in enumerate(tqdm(self.data_infos)):
             img_id = self.img_ids[i]
+            #ann_info = self.get_ann_info(i)
+
+            #info = dict(img_info=img_info, ann_info=ann_info)
+
+            #self.pre_pipeline(info)
+            #data = self.pipeline(info)
+            #gt_masks = torch.from_numpy(data['gt_masks'].data.to_ndarray())
+            #non_valid_idx = []
+
+            #for idx, mask in enumerate(gt_masks):
+            #    contour, _ = cv2.findContours(mask.numpy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+            #    contour.sort(key=lambda x: cv2.contourArea(x), reverse=True)
+            #    try:
+            #        count = contour[0][:, 0, :]
+            #    except IndexError:
+            #        non_valid_idx.append(idx)
+
+            #if len(non_valid_idx) > 0:
+            #    print(f'Found {len(non_valid_idx)} gt_masks...')
+            #if len(non_valid_idx) == gt_masks.size(0):
+            #    print('Found 1 image containing all non-valid gt_masks...')
+
             if self.filter_empty_gt and img_id not in ids_in_cat:
                 continue
             if min(img_info['width'], img_info['height']) >= min_size:
