@@ -2,7 +2,6 @@ from .builder import DATASETS, PIPELINES, build_dataloader, build_dataset
 from .cityscapes import CityscapesDataset
 from .coco import CocoDataset
 from .custom import CustomDataset
-from .custom_v1 import CustomDatasetV1
 from .dataset_wrappers import (ClassBalancedDataset, ConcatDataset,
                                RepeatDataset)
 from .deepfashion import DeepFashionDataset
@@ -13,8 +12,6 @@ from .voc import VOCDataset
 from .wider_face import WIDERFaceDataset
 from .xml_style import XMLDataset
 
-from .coco_seg import Coco_Seg_Dataset
-from .coco_seg_fast import Coco_SegFast_Dataset
 from .coco_seg_v2 import CocoSegDatasetV2
 
 __all__ = [
