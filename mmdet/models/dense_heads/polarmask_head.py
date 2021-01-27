@@ -408,7 +408,7 @@ class PolarMask_Head(nn.Module):
 
         mlvl_scores = torch.cat(mlvl_scores)
         padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
-        mlvl_scores = torch.cat([padding, mlvl_scores], dim=1)
+        mlvl_scores = torch.cat([mlvl_scores, padding], dim=1)  # background class index is after all class index
         mlvl_centerness = torch.cat(mlvl_centerness)
 
         centerness_factor = 0.5  # mask centerness is smaller than origin centerness, so add a constant is important or the score will be too low.
