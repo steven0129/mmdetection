@@ -1,18 +1,10 @@
 # model settings
 model = dict(
     type='PolarMask',
-    pretrained='open-mmlab://resnet50_caffe',
-    backbone=dict(
-        type='ResNet',
-        depth=50,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=False),
-        style='caffe'),
+    backbone=dict(type='MobileNetV2'),
     neck=dict(
         type='FPN',
-        in_channels=[256, 512, 1024, 2048],
+        in_channels=[24, 32, 96, 1280],
         out_channels=256,
         start_level=1,
         add_extra_convs=True,
@@ -60,7 +52,7 @@ img_norm_cfg = dict(mean=[0, 0, 0], std=[256, 256, 256], to_rgb=True)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='Resize', img_scale=(1280, 768), keep_ratio=False),
+    dict(type='Resize', img_scale=(640, 384), keep_ratio=False),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='DefaultFormatBundle'),
@@ -71,7 +63,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1280, 768),
+        img_scale=(640, 384),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=False),
@@ -82,8 +74,8 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=4,
-    workers_per_gpu=4,
+    samples_per_gpu=16,
+    workers_per_gpu=12,
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/custom_instances_train2017.json',
@@ -103,7 +95,7 @@ data = dict(
 
 # optimizer
 lr_ratio = 1
-optimizer = dict(type='SGD', lr=0.01 * lr_ratio, momentum=0.9, weight_decay=0.0001, paramwise_cfg=dict(bias_lr_mult=2., bias_decay_mult=0.))
+optimizer = dict(type='SGD', lr=0.001 * lr_ratio, momentum=0.9, weight_decay=0.0001, paramwise_cfg=dict(bias_lr_mult=2., bias_decay_mult=0.))
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
