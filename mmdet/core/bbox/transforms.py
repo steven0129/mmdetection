@@ -18,13 +18,13 @@ def bbox_mask2result(bboxes, masks, labels, num_classes, img_meta):
     """
     ori_shape = img_meta['ori_shape']
     img_h, img_w, _ = ori_shape
-    masks = masks.cpu().numpy()
     mask_results = [[] for _ in range(num_classes)]
 
     for i in range(masks.shape[0]):
         im_mask = np.zeros((img_h, img_w), dtype=np.uint8)
-        mask = [np.expand_dims(np.transpose(masks[i]), axis=1).astype(np.int32)]
+        mask = [masks[i].transpose(1,0).unsqueeze(1).int().data.cpu().numpy()]
         im_mask = cv2.drawContours(im_mask, mask, -1, 1, -1)
+        
         label = labels[i]
         mask_results[label].append(np.array(im_mask, dtype=np.bool))
 
