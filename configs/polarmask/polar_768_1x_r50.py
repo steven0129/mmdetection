@@ -1,10 +1,20 @@
 # model settings
 model = dict(
     type='PolarMask',
-    backbone=dict(type='MobileNetV2'),
+    pretrained='torchvision://resnet50',
+    backbone=dict(
+        type='ResNet',
+        depth=50,
+        num_stages=4,
+        out_indices=(0, 1, 2, 3),
+        frozen_stages=1,
+        norm_cfg=dict(type='BN', requires_grad=True),
+        norm_eval=True,
+        style='pytorch'
+    ),
     neck=dict(
         type='FPN',
-        in_channels=[24, 32, 96, 1280],
+        in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         start_level=1,
         add_extra_convs=True,
@@ -95,7 +105,7 @@ data = dict(
 
 # optimizer
 lr_ratio = 1
-optimizer = dict(type='SGD', lr=0.001 * lr_ratio, momentum=0.9, weight_decay=0.0001, paramwise_cfg=dict(bias_lr_mult=2., bias_decay_mult=0.))
+optimizer = dict(type='SGD', lr=0.01 * lr_ratio, momentum=0.9, weight_decay=0.0001, paramwise_cfg=dict(bias_lr_mult=2., bias_decay_mult=0.))
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
@@ -103,7 +113,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3 / lr_ratio,
-    step=[8, 11])
+    step=[50, 80, 90, 95])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -114,11 +124,11 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 100
 device_ids = [0]
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/trash'
 load_from = None
 resume_from = None
-workflow = [('train', 1)]
+workflow = [('train', 1), ('val', 1)]
