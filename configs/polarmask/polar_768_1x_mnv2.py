@@ -1,6 +1,7 @@
 # model settings
 model = dict(
     type='PolarMask',
+    pretrained='configs/polarmask/mobilenetv2_1.0-0c6065bc.pth',
     backbone=dict(type='MobileNetV2'),
     neck=dict(
         type='FPN',
@@ -103,7 +104,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3 / lr_ratio,
-    step=[8, 11])
+    step=[50, 80, 90, 95])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -114,7 +115,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 100
 device_ids = [0]
 dist_params = dict(backend='nccl')
 log_level = 'INFO'

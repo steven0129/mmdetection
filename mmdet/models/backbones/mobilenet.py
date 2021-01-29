@@ -1,39 +1,78 @@
+import torch
 import torch.nn as nn
 from ..builder import BACKBONES
 
-class ConvBNReLU(nn.Sequential):
-    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, groups=1):
-        padding = (kernel_size - 1) // 2
-        super(ConvBNReLU, self).__init__(
-            nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
-            nn.BatchNorm2d(out_planes),
-            nn.ReLU()
-        )
+def _make_divisible(v, divisor, min_value=None):
+    """
+    This function is taken from the original tf repo.
+    It ensures that all layers have a channel number that is divisible by 8
+    It can be seen here:
+    https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet.py
+    :param v:
+    :param divisor:
+    :param min_value:
+    :return:
+    """
+    if min_value is None:
+        min_value = divisor
+    new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
+    # Make sure that round down does not go down by more than 10%.
+    if new_v < 0.9 * v:
+        new_v += divisor
+    return new_v
+
+
+def conv_3x3_bn(inp, oup, stride):
+    return nn.Sequential(
+        nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
+        nn.BatchNorm2d(oup),
+        nn.ReLU(inplace=True)
+    )
+
+
+def conv_1x1_bn(inp, oup):
+    return nn.Sequential(
+        nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
+        nn.BatchNorm2d(oup),
+        nn.ReLU(inplace=True)
+    )
+
 
 class InvertedResidual(nn.Module):
     def __init__(self, inp, oup, stride, expand_ratio):
         super(InvertedResidual, self).__init__()
-        self.stride = stride
         assert stride in [1, 2]
 
-        hidden_dim = int(round(inp * expand_ratio))
-        self.use_res_connect = self.stride == 1 and inp == oup
+        hidden_dim = round(inp * expand_ratio)
+        self.identity = stride == 1 and inp == oup
 
-        layers = []
-        if expand_ratio != 1:
-            # pw
-            layers.append(ConvBNReLU(inp, hidden_dim, kernel_size=1))
-        layers.extend([
-            # dw
-            ConvBNReLU(hidden_dim, hidden_dim, stride=stride, groups=hidden_dim),
-            # pw-linear
-            nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
-            nn.BatchNorm2d(oup),
-        ])
-        self.conv = nn.Sequential(*layers)
+        if expand_ratio == 1:
+            self.conv = nn.Sequential(
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU(inplace=True),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(oup),
+            )
+        else:
+            self.conv = nn.Sequential(
+                # pw
+                nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU(inplace=True),
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU(inplace=True),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(oup),
+            )
 
     def forward(self, x):
-        if self.use_res_connect:
+        if self.identity:
             return x + self.conv(x)
         else:
             return self.conv(x)
@@ -43,63 +82,59 @@ class InvertedResidual(nn.Module):
 class MobileNetV2(nn.Module):
     def __init__(self, width_mult=1., out_stages=(1, 2, 4, 6), last_channel=1280):
         super(MobileNetV2, self).__init__()
-        self.width_mult = width_mult
-        self.out_stages = out_stages
-        input_channel = 32
-        self.last_channel = last_channel
-        self.interverted_residual_setting = [
+        # setting of inverted residual blocks
+        self.cfgs = [
             # t, c, n, s
-            [1, 16, 1, 1],
-            [6, 24, 2, 2],
-            [6, 32, 3, 2],
-            [6, 64, 4, 2],
-            [6, 96, 3, 1],
+            [1,  16, 1, 1],
+            [6,  24, 2, 2],
+            [6,  32, 3, 2],
+            [6,  64, 4, 2],
+            [6,  96, 3, 1],
             [6, 160, 3, 2],
             [6, 320, 1, 1],
         ]
 
+        self.out_indices = []
+        self.counter = 0
+
         # building first layer
-        self.input_channel = int(input_channel * width_mult)
-        self.first_layer = ConvBNReLU(3, input_channel, stride=2)
+        input_channel = _make_divisible(32 * width_mult, 4 if width_mult == 0.1 else 8)
+        layers = [conv_3x3_bn(3, input_channel, 2)]
         # building inverted residual blocks
-        for i in range(7):
-            name = 'stage{}'.format(i)
-            setattr(self, name, self.build_mobilenet_stage(stage_num=i))
+        block = InvertedResidual
+        for t, c, n, s in self.cfgs:
+            output_channel = _make_divisible(c * width_mult, 4 if width_mult == 0.1 else 8)
+            for i in range(n):
+                layers.append(block(input_channel, output_channel, s if i == 0 else 1, t))
+                input_channel = output_channel
+                self.counter += 1
 
-    def build_mobilenet_stage(self, stage_num):
-        stage = []
-        t, c, n, s = self.interverted_residual_setting[stage_num]
-        output_channel = int(c * self.width_mult)
-        for i in range(n):
-            if i == 0:
-                stage.append(InvertedResidual(self.input_channel, output_channel, s, expand_ratio=t))
-            else:
-                stage.append(InvertedResidual(self.input_channel, output_channel, 1, expand_ratio=t))
-            self.input_channel = output_channel
-        if stage_num == 6:
-            last_layer = ConvBNReLU(self.input_channel, self.last_channel, kernel_size=1)
-            stage.append(last_layer)
-        stage = nn.Sequential(*stage)
-        return stage
-
+        self.features = nn.Sequential(*layers)
+        # building last several layers
+        output_channel = _make_divisible(1280 * width_mult, 4 if width_mult == 0.1 else 8) if width_mult > 1.0 else 1280
+        self.conv = conv_1x1_bn(input_channel, output_channel)
 
     def forward(self, x):
-        x = self.first_layer(x)
-        output = []
-        for i in range(0, 7):
-            stage = getattr(self, 'stage{}'.format(i))
-            x = stage(x)
-            if i in self.out_stages:
-                output.append(x)
+        buffer = []
 
-        return tuple(output)
+        for i in range(self.counter + 1):
+            x = self.features[i](x)
+            buffer.append(x)
+        
+        x = self.conv(x)
+        buffer.append(x)
+
+        return tuple([buffer[3], buffer[6], buffer[13], buffer[-1]])
 
     def init_weights(self, pretrained=None):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.normal_(m.weight, std=0.001)
-                if m.bias is not None:
+        if pretrained:
+            self.load_state_dict(torch.load(pretrained), strict=False)
+        else:
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.normal_(m.weight, std=0.001)
+                    if m.bias is not None:
+                        m.bias.data.zero_()
+                elif isinstance(m, nn.BatchNorm2d):
+                    m.weight.data.fill_(1)
                     m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
