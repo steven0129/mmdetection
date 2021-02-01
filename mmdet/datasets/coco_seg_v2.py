@@ -44,6 +44,7 @@ class CocoSegDatasetV2(CustomDataset):
 
         self.pre_pipeline(info)
         data = self.pipeline(info)
+        if data == None: return None
 
         pad_shape = data['img_metas'].data['pad_shape']
         gt_bboxes = data['gt_bboxes'].data
@@ -73,9 +74,13 @@ class CocoSegDatasetV2(CustomDataset):
 
         gt_bboxes, gt_masks, gt_labels = self._filter_gt_masks_empty(gt_bboxes, gt_masks, gt_labels)
 
-        _labels, _bbox_targets, _mask_targets = self.polar_target_single(
-            gt_bboxes, gt_masks, gt_labels, concat_points, concat_regress_ranges
-        )
+        try:
+            _labels, _bbox_targets, _mask_targets = self.polar_target_single(
+                gt_bboxes, gt_masks, gt_labels, concat_points, concat_regress_ranges
+            )
+        except ValueError:
+            print(f'Image {idx} skip because of polar_target_single exception...')
+            return None
 
         data['_gt_labels'] = DC(_labels)
         data['_gt_bboxes'] = DC(_bbox_targets)
