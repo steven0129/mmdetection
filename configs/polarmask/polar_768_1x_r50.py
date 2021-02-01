@@ -62,7 +62,7 @@ img_norm_cfg = dict(mean=[0, 0, 0], std=[256, 256, 256], to_rgb=True)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='Resize', img_scale=(640, 384), keep_ratio=False),
+    dict(type='Resize', img_scale=(1280, 768), keep_ratio=False),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='DefaultFormatBundle'),
@@ -73,7 +73,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(640, 384),
+        img_scale=(1280, 768),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=False),
@@ -84,8 +84,8 @@ test_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=16,
-    workers_per_gpu=12,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/custom_instances_train2017.json',
