@@ -42,7 +42,7 @@ class PolarMask_Head(nn.Module):
                      use_sigmoid=True,
                      loss_weight=1.0),
                  conv_cfg=None,
-                 norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
+                 norm_cfg=dict(type='BN', requires_grad=True)):
         super(PolarMask_Head, self).__init__()
 
         self.num_classes = num_classes
