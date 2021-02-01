@@ -51,8 +51,19 @@ data_root = 'data/coco/'
 img_norm_cfg = dict(mean=[0, 0, 0], std=[256, 256, 256], to_rgb=True)
 
 train_pipeline = [
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', to_float32=True),
     dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
+    dict(type='PhotoMetricDistortion'),
+    dict(
+        type='Expand',
+        mean=img_norm_cfg['mean'],
+        to_rgb=img_norm_cfg['to_rgb'],
+        ratio_range=(1, 4)),
+    dict(
+        type='MinIoURandomCrop',
+        min_ious=(0.1, 0.3, 0.5, 0.7, 0.9),
+        min_crop_size=0.3
+    ),
     dict(type='Resize', img_scale=(640, 384), keep_ratio=False),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
@@ -102,7 +113,7 @@ optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 lr_config = dict(
     policy='step',
     warmup='linear',
-    warmup_iters=500,
+    warmup_iters=2000,
     warmup_ratio=1.0 / 3 / lr_ratio,
     step=[50, 80, 90, 95])
 checkpoint_config = dict(interval=1)
