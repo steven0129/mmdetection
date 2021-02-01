@@ -313,7 +313,7 @@ class PolarMask_Head(nn.Module):
     def polar_centerness_target(self, pos_mask_targets):
         # only calculate pos centerness targets, otherwise there may be nan
         centerness_targets = (pos_mask_targets.min(dim=-1)[0] / pos_mask_targets.max(dim=-1)[0])
-        return torch.sqrt(centerness_targets)
+        return torch.sqrt(centerness_targets) + 1e-8
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses'))
     def get_bboxes(self,
