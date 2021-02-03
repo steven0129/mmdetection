@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from mmcv.cnn import normal_init
 
-from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms
+from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms, cross_class_nms
 # from mmdet.ops import ModulatedDeformConvPack
 
 from mmdet.models.builder import build_loss
@@ -416,7 +416,7 @@ class PolarMask_Head(nn.Module):
             '''1 mask->min_bbox->nms, performance same to origin box'''
             a = _mlvl_masks
             _mlvl_bboxes = torch.stack([a[:, 0].min(1)[0],a[:, 1].min(1)[0],a[:, 0].max(1)[0],a[:, 1].max(1)[0]],-1)
-            det_bboxes, det_labels, keep = multiclass_nms(
+            det_bboxes, det_labels, keep = cross_class_nms(
                 _mlvl_bboxes,
                 mlvl_scores,
                 cfg.score_thr,

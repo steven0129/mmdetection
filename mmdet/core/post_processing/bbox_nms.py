@@ -3,6 +3,54 @@ from mmcv.ops.nms import batched_nms
 
 from mmdet.core.bbox.iou_calculators import bbox_overlaps
 
+def cross_class_nms(bboxes, scores, score_thr, nms_cfg, max_num=-1, score_factors=None, return_inds=False):
+    iou_thr = nms_cfg['iou_thr']
+    
+    x1 = bboxes[:, 0]
+    y1 = bboxes[:, 1]
+    x2 = bboxes[:, 2]
+    y2 = bboxes[:, 3]
+
+    if score_factors is not None:
+        scores = scores * score_factors[:, None]
+
+    scores, labels = torch.max(scores, dim=-1)
+    scores[scores <= score_thr] = 0
+    _, order = scores.sort(0, descending=True)
+    
+    areas = (x2 - x1) * (y2 - y1)
+    keep = []
+    
+    while order.numel() > 0:
+        if order.numel() == 1:
+            i = order.item()
+            keep.append(i)
+            break
+        else:
+            i = order[0].item()
+            keep.append(i)
+
+        xx1 = x1[order[1:]].clamp(min=x1[i])
+        yy1 = y1[order[1:]].clamp(min=y1[i])
+        xx2 = x2[order[1:]].clamp(max=x2[i])
+        yy2 = y2[order[1:]].clamp(max=y2[i])
+
+        inter = (xx2 - xx1).clamp(min=0) * (yy2 - yy1).clamp(min=0)
+        iou = inter / (areas[i] + areas[order[1:]] - inter)
+        idx = (iou <= iou_thr).nonzero().squeeze()
+        
+        if idx.numel() == 0:
+            break
+
+        order = order[idx+1]
+
+    if max_num > 0:
+        keep = keep[:max_num]
+
+    if return_inds:
+        return torch.cat((bboxes[keep], torch.unsqueeze(scores[keep], 1)), -1), labels[keep], keep
+    else:
+        return torch.cat((bboxes[keep], torch.unsqueeze(scores[keep], 1)), -1)
 
 def multiclass_nms(multi_bboxes,
                    multi_scores,
