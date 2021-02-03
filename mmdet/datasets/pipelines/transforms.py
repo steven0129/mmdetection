@@ -1,10 +1,12 @@
 import inspect
 
+import cv2
 import mmcv
 import numpy as np
 from numpy import random
 
 from mmdet.core import PolygonMasks
+from mmdet.core import BitmapMasks
 from mmdet.core.evaluation.bbox_overlaps import bbox_overlaps
 from ..builder import PIPELINES
 
@@ -248,7 +250,8 @@ class Resize(object):
             if self.keep_ratio:
                 results[key] = results[key].rescale(results['scale'])
             else:
-                results[key] = results[key].resize(results['img_shape'][:2])
+                resized_masks = np.stack( [ cv2.resize(mask, (results['img_shape'][1], results['img_shape'][0]), interpolation=cv2.INTER_NEAREST) for mask in results[key].masks] )
+                results[key] = BitmapMasks(resized_masks, *results['img_shape'][:2])
 
     def _resize_seg(self, results):
         """Resize semantic segmentation map with ``results['scale']``."""
