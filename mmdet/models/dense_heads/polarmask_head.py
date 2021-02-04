@@ -143,7 +143,6 @@ class PolarMask_Head(nn.Module):
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'mask_preds', 'centernesses'))
     def loss(self,
              cls_scores,
-             bbox_preds,
              centernesses,
              mask_preds,
              gt_bboxes,
@@ -153,10 +152,10 @@ class PolarMask_Head(nn.Module):
              gt_masks,
              gt_bboxes_ignore=None,
              extra_data=None):
-        assert len(cls_scores) == len(bbox_preds) == len(centernesses) == len(mask_preds)
+        assert len(cls_scores) == len(centernesses) == len(mask_preds)
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
-        all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
-                                           bbox_preds[0].device)
+        all_level_points = self.get_points(featmap_sizes, mask_preds[0].dtype,
+                                           mask_preds[0].device)
 
         labels, bbox_targets, mask_targets = self.polar_target(all_level_points, extra_data)
 
@@ -165,10 +164,6 @@ class PolarMask_Head(nn.Module):
         flatten_cls_scores = [
             cls_score.permute(0, 2, 3, 1).reshape(-1, self.cls_out_channels)
             for cls_score in cls_scores]
-        flatten_bbox_preds = [
-            bbox_pred.permute(0, 2, 3, 1).reshape(-1, 4)
-            for bbox_pred in bbox_preds
-        ]
         flatten_centerness = [
             centerness.permute(0, 2, 3, 1).reshape(-1)
             for centerness in centernesses
@@ -178,12 +173,10 @@ class PolarMask_Head(nn.Module):
             for mask_pred in mask_preds
         ]
         flatten_cls_scores = torch.cat(flatten_cls_scores)  # [num_pixel, 80]
-        flatten_bbox_preds = torch.cat(flatten_bbox_preds)  # [num_pixel, 4]
         flatten_mask_preds = torch.cat(flatten_mask_preds)  # [num_pixel, 36]
         flatten_centerness = torch.cat(flatten_centerness)  # [num_pixel]
 
         flatten_labels = torch.cat(labels).long()  # [num_pixel]
-        flatten_bbox_targets = torch.cat(bbox_targets)  # [num_pixel, 4]
         flatten_mask_targets = torch.cat(mask_targets)  # [num_pixel, 36]
         flatten_points = torch.cat([points.repeat(num_imgs, 1)
                                     for points in all_level_points])  # [num_pixel,2]
@@ -191,25 +184,14 @@ class PolarMask_Head(nn.Module):
         num_pos = len(pos_inds)
 
         loss_cls = self.loss_cls(flatten_cls_scores, flatten_labels, avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
-        pos_bbox_preds = flatten_bbox_preds[pos_inds]
         pos_centerness = flatten_centerness[pos_inds]
         pos_mask_preds = flatten_mask_preds[pos_inds]
 
         if num_pos > 0:
-            pos_bbox_targets = flatten_bbox_targets[pos_inds]
             pos_mask_targets = flatten_mask_targets[pos_inds]
             pos_centerness_targets = self.polar_centerness_target(pos_mask_targets)
 
             pos_points = flatten_points[pos_inds]
-            pos_decoded_bbox_preds = distance2bbox(pos_points, pos_bbox_preds)
-            pos_decoded_target_preds = distance2bbox(pos_points, pos_bbox_targets)
-
-            # centerness weighted iou loss
-            loss_bbox = self.loss_bbox(
-                pos_decoded_bbox_preds,
-                pos_decoded_target_preds,
-                weight=pos_centerness_targets,
-                avg_factor=pos_centerness_targets.sum())
             loss_mask = self.loss_mask(pos_mask_preds,
                                        pos_mask_targets,
                                        weight=pos_centerness_targets,
@@ -218,13 +200,11 @@ class PolarMask_Head(nn.Module):
             loss_centerness = self.loss_centerness(pos_centerness,
                                                    pos_centerness_targets)
         else:
-            loss_bbox = pos_bbox_preds.sum()
             loss_mask = pos_mask_preds.sum()
             loss_centerness = pos_centerness.sum()
 
         return dict(
             loss_cls=loss_cls,
-            loss_bbox=loss_bbox,
             loss_mask=loss_mask,
             loss_centerness=loss_centerness)
 
@@ -312,7 +292,7 @@ class PolarMask_Head(nn.Module):
         mask_preds = [mask_pred.cuda() for mask_pred in mask_preds]
 
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
-        mlvl_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
+        mlvl_points = self.get_points(featmap_sizes, mask_preds[0].dtype,
                                       bbox_preds[0].device)
         result_list = []
         for img_id in range(len(img_metas)):
