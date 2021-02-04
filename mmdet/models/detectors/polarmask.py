@@ -62,7 +62,19 @@ class PolarMask(SingleStageDetector):
         outs = self.bbox_head(x)
 
         if torch.onnx.is_in_onnx_export():
-            return outs
+            final_cls = []
+            final_centerness = []
+            final_mask = []
+            for i in range(len(outs[0])):
+                final_cls.append(torch.reshape(outs[0][i], (1, 11, -1)))
+                final_centerness.append(torch.reshape(outs[1][i], (1, 1, -1)))
+                final_mask.append(torch.reshape(outs[2][i], (1, 36, -1)))
+
+            final_cls = torch.cat(final_cls, -1)
+            final_centerness = torch.cat(final_centerness, -1)
+            final_mask = torch.cat(final_mask, -1)
+
+            return final_cls, final_centerness, final_mask
         else:
             bbox_inputs = outs + (img_meta, self.test_cfg, rescale)
             bbox_list = self.bbox_head.get_bboxes(*bbox_inputs)
