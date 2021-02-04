@@ -8,7 +8,7 @@ import torch
 
 from mmdet.core import (build_model_from_cfg, generate_inputs_and_wrap_model,
                         preprocess_example_input)
-
+from mmdet.core import multi_apply
 
 def pytorch2onnx(config_path,
                  checkpoint_path,

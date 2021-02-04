@@ -12,6 +12,7 @@ from IPython import embed
 import cv2
 import numpy as np
 import math
+import onnx
 import time
 
 INF = 1e8
@@ -271,9 +272,8 @@ class PolarMask_Head(nn.Module):
         y_range = torch.arange(
             0, h * stride, stride, dtype=dtype, device=device)
         y, x = torch.meshgrid(y_range, x_range)
-        points = torch.stack(
-            (x.reshape(-1), y.reshape(-1)), dim=-1) + stride // 2
-        return points
+        points = torch.stack((x.reshape(-1), y.reshape(-1)), dim=-1) + stride // 2
+        return points.cuda()
 
     def polar_target(self, points, extra_data):
         assert len(points) == len(self.regress_ranges)
@@ -326,6 +326,11 @@ class PolarMask_Head(nn.Module):
                    rescale=None):
         assert len(cls_scores) == len(bbox_preds)
         num_levels = len(cls_scores)
+
+        cls_scores = [cls_score.cuda() for cls_score in cls_scores]
+        bbox_preds = [bbox_pred.cuda() for bbox_pred in bbox_preds]
+        centernesses = [centerness.cuda() for centerness in centernesses]
+        mask_preds = [mask_pred.cuda() for mask_pred in mask_preds]
 
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         mlvl_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
@@ -398,13 +403,13 @@ class PolarMask_Head(nn.Module):
 
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         mlvl_masks = torch.cat(mlvl_masks)
-        if rescale:
-            _mlvl_bboxes = mlvl_bboxes / mlvl_bboxes.new_tensor(scale_factor)
-            try:
-                scale_factor = torch.Tensor(scale_factor)[:2].cuda().unsqueeze(1).repeat(1, 36)
-                _mlvl_masks = mlvl_masks / scale_factor
-            except:
-                _mlvl_masks = mlvl_masks / mlvl_masks.new_tensor(scale_factor)
+        
+        _mlvl_bboxes = mlvl_bboxes / mlvl_bboxes.new_tensor(scale_factor)
+        try:
+            scale_factor = torch.Tensor(scale_factor)[:2].cuda().unsqueeze(1).repeat(1, 36)
+            _mlvl_masks = mlvl_masks / scale_factor
+        except:
+            _mlvl_masks = mlvl_masks / mlvl_masks.new_tensor(scale_factor)
 
         mlvl_scores = torch.cat(mlvl_scores)
         padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)

@@ -61,15 +61,18 @@ class PolarMask(SingleStageDetector):
         x = self.extract_feat(img)
         outs = self.bbox_head(x)
 
-        bbox_inputs = outs + (img_meta, self.test_cfg, rescale)
-        bbox_list = self.bbox_head.get_bboxes(*bbox_inputs)
+        if torch.onnx.is_in_onnx_export():
+            return outs
+        else:
+            bbox_inputs = outs + (img_meta, self.test_cfg, rescale)
+            bbox_list = self.bbox_head.get_bboxes(*bbox_inputs)
 
-        results = [
-            bbox_mask2result(det_bboxes, det_masks, det_labels, self.bbox_head.num_classes, img_meta[0])
-            for det_bboxes, det_labels, det_masks in bbox_list]
+            results = [
+                bbox_mask2result(det_bboxes, det_masks, det_labels, self.bbox_head.num_classes, img_meta[0])
+                for det_bboxes, det_labels, det_masks in bbox_list]
 
-        bbox_results = results[0][0]
-        mask_results = results[0][1]
+            bbox_results = results[0][0]
+            mask_results = results[0][1]
 
-        return [(bbox_results, mask_results)]
+            return [(bbox_results, mask_results)]
 
