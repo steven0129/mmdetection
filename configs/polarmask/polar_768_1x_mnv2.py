@@ -64,7 +64,7 @@ train_pipeline = [
         min_ious=(0.7, 0.9),
         min_crop_size=0.5
     ),
-    dict(type='Resize', img_scale=(640, 384), keep_ratio=False),
+    dict(type='Resize', img_scale=(480, 256), keep_ratio=False),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='DefaultFormatBundle'),
@@ -75,7 +75,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(640, 384),
+        img_scale=(480, 256),
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=False),
@@ -132,5 +132,5 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/trash'
 load_from = None
-resume_from = None
+resume_from = 'logs-20210204-480x256/latest.pth'
 workflow = [('train', 1), ('val', 1)]
