@@ -59,7 +59,7 @@ class CocoSegDatasetV2(CustomDataset):
         self.strides = [8, 16, 32, 64, 128]
         self.regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512),(512, INF))
         
-        featmap_sizes = self.get_featmap_size(pad_shape)
+        featmap_sizes = torch.Tensor([[32, 60], [16, 30], [8, 15], [4, 8], [2, 4]])
         num_levels = len(self.strides)
         all_level_points = self.get_points(featmap_sizes)
         self.num_points_per_level = [i.size()[0] for i in all_level_points]
