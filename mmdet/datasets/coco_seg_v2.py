@@ -2,6 +2,7 @@ import itertools
 import logging
 import os.path as osp
 import tempfile
+import math
 from collections import OrderedDict
 
 import cv2
@@ -59,7 +60,7 @@ class CocoSegDatasetV2(CustomDataset):
         self.strides = [8, 16, 32, 64, 128]
         self.regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512),(512, INF))
         
-        featmap_sizes = torch.Tensor([[32, 60], [16, 30], [8, 15], [4, 8], [2, 4]])
+        featmap_sizes = self.get_featmap_size(pad_shape)
         num_levels = len(self.strides)
         all_level_points = self.get_points(featmap_sizes)
         self.num_points_per_level = [i.size()[0] for i in all_level_points]
@@ -127,7 +128,7 @@ class CocoSegDatasetV2(CustomDataset):
         h,w = shape[:2]
         featmap_sizes = []
         for i in self.strides:
-            featmap_sizes.append([int(h / i), int(w / i)])
+            featmap_sizes.append([math.ceil(h / i), math.ceil(w / i)])
         return featmap_sizes
 
     def get_points(self, featmap_sizes):
