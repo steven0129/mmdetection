@@ -69,7 +69,7 @@ class PolarMask_Head(nn.Module):
         self.count = 0
 
         # test
-        self.angles = torch.range(0, 350, 10).cuda() / 180 * math.pi
+        self.angles = torch.range(0, 350, 10) / 180 * math.pi
 
         # Polar Target Generation Config
         self.center_sample = center_sample
@@ -208,27 +208,27 @@ class PolarMask_Head(nn.Module):
         pos_inds = (flatten_labels != (self.num_classes - 1)).nonzero().reshape(-1)
         num_pos = len(pos_inds)
 
-        loss_cls = self.loss_cls(flatten_cls_scores, flatten_labels, avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
+        loss_cls = self.loss_cls(flatten_cls_scores.cuda(), flatten_labels.cuda(), avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
         pos_centerness = flatten_centerness[pos_inds]
         pos_mask_preds = flatten_mask_preds[pos_inds]
 
         if num_pos > 0:
             pos_mask_targets = flatten_mask_targets[pos_inds]
-            pos_mask_targets = pos_mask_targets.cuda()
+            pos_mask_targets = pos_mask_targets
             pos_centerness_targets = self.polar_centerness_target(pos_mask_targets)
-            pos_centerness_targets = pos_centerness_targets.cuda()
+            pos_centerness_targets = pos_centerness_targets
 
             pos_points = flatten_points[pos_inds]
-            loss_mask = self.loss_mask(pos_mask_preds,
-                                       pos_mask_targets,
-                                       weight=pos_centerness_targets,
-                                       avg_factor=pos_centerness_targets.sum())
+            loss_mask = self.loss_mask(pos_mask_preds.cuda(),
+                                       pos_mask_targets.cuda(),
+                                       weight=pos_centerness_targets.cuda(),
+                                       avg_factor=pos_centerness_targets.sum().cuda())
 
-            loss_centerness = self.loss_centerness(pos_centerness,
-                                                   pos_centerness_targets)
+            loss_centerness = self.loss_centerness(pos_centerness.cuda(),
+                                                   pos_centerness_targets.cuda())
         else:
-            loss_mask = pos_mask_preds.sum()
-            loss_centerness = pos_centerness.sum()
+            loss_mask = pos_mask_preds.sum().cuda()
+            loss_centerness = pos_centerness.sum().cuda()
 
         return dict(
             loss_cls=loss_cls,
@@ -236,6 +236,11 @@ class PolarMask_Head(nn.Module):
             loss_centerness=loss_centerness)
 
     def polar_target_single(self, gt_bboxes, gt_masks, gt_labels, points, regress_ranges, num_points_per_level):
+        gt_bboxes = gt_bboxes.cpu()
+        gt_labels = gt_labels.cpu()
+        points = points.cpu()
+        regress_ranges = regress_ranges.cpu()
+
         num_points = points.size(0)
         num_gts = gt_labels.size(0)
         if num_gts == 0:
@@ -265,13 +270,13 @@ class PolarMask_Head(nn.Module):
             if single_cnt != None:
                 cnt, contour = single_cnt
                 contour = contour[0]
-                contour = torch.Tensor(contour).float().cuda()
+                contour = torch.Tensor(contour).float()
                 y, x = cnt
                 mask_centers.append([x,y])
                 mask_contours.append(contour)
             else:
                 return None
-        mask_centers = torch.Tensor(mask_centers).float().cuda()
+        mask_centers = torch.Tensor(mask_centers).float()
         # 把mask_centers assign到不同的层上,根据regress_range和重心的位置
         mask_centers = mask_centers[None].expand(num_points, num_gts, 2)
 
@@ -455,7 +460,7 @@ class PolarMask_Head(nn.Module):
             0, h * stride, stride, dtype=dtype, device=device)
         y, x = torch.meshgrid(y_range, x_range)
         points = torch.stack((x.reshape(-1), y.reshape(-1)), dim=-1) + stride // 2
-        return points.cuda()
+        return points
 
     def polar_target(self, cls_scores, gt_bboxes, gt_masks, gt_labels):
         num_batch = cls_scores[0].size(0)
@@ -496,9 +501,9 @@ class PolarMask_Head(nn.Module):
                 mask_targets_list.append(torch.zeros([sum(num_points_per_level), 36]))
                 broken_batch_idx.append(batch_idx)
         
-        labels_list = list(map(lambda x: x.cuda(), labels_list))
-        bbox_targets_list = list(map(lambda x: x.cuda(), bbox_targets_list))
-        mask_targets_list = list(map(lambda x: x.cuda(), mask_targets_list))
+        labels_list = list(map(lambda x: x, labels_list))
+        bbox_targets_list = list(map(lambda x: x, bbox_targets_list))
+        mask_targets_list = list(map(lambda x: x, mask_targets_list))
 
         batch_set = set(range(cls_scores[0].size(0)))
         broken_set = set(broken_batch_idx)
@@ -546,9 +551,9 @@ class PolarMask_Head(nn.Module):
                    rescale=None):
         num_levels = len(cls_scores)
 
-        cls_scores = [cls_score.cuda() for cls_score in cls_scores]
-        centernesses = [centerness.cuda() for centerness in centernesses]
-        mask_preds = [mask_pred.cuda() for mask_pred in mask_preds]
+        cls_scores = [cls_score for cls_score in cls_scores]
+        centernesses = [centerness for centerness in centernesses]
+        mask_preds = [mask_pred for mask_pred in mask_preds]
 
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         mlvl_points = self.get_points(featmap_sizes, mask_preds[0].dtype,
@@ -611,7 +616,7 @@ class PolarMask_Head(nn.Module):
         mlvl_masks = torch.cat(mlvl_masks)
         
         try:
-            scale_factor = torch.Tensor(scale_factor)[:2].cuda().unsqueeze(1).repeat(1, 36)
+            scale_factor = torch.Tensor(scale_factor)[:2].unsqueeze(1).repeat(1, 36)
             _mlvl_masks = mlvl_masks / scale_factor
         except:
             _mlvl_masks = mlvl_masks / mlvl_masks.new_tensor(scale_factor)
