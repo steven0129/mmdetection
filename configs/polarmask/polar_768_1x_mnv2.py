@@ -132,5 +132,5 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/trash'
 load_from = None
-resume_from = 'logs-20210204-480x256/latest.pth'
+resume_from = None
 workflow = [('train', 1), ('val', 1)]
