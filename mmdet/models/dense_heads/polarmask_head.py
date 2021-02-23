@@ -607,6 +607,11 @@ class PolarMask_Head(nn.Module):
                 mask_pred = mask_pred[topk_inds, :]
                 scores = scores[topk_inds, :]
                 centerness = centerness[topk_inds]
+
+            points = points.cpu()
+            mask_pred = mask_pred.cpu()
+            scores = scores.cpu()
+            centerness = centerness.cpu()
             masks = distance2mask(points, mask_pred, self.angles, max_shape=img_shape)
 
             mlvl_scores.append(scores)
